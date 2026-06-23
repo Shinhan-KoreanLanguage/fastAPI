@@ -1,0 +1,5 @@
+# Core dependencies (install these and the server runs immediately)
+fastapi
+uvicorn[standard]
+pydantic-settings
+python-multipart
