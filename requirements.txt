@@ -3,3 +3,8 @@ fastapi
 uvicorn[standard]
 pydantic-settings
 python-multipart
+
+# STT (Whisper 기반 한국어 음성 인식)
+torch
+transformers
+imageio-ffmpeg  # 오디오 디코딩(wav/mp3/m4a 등)에 쓸 ffmpeg 바이너리를 pip으로 제공
