@@ -9,6 +9,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.v1 import stt
 from app.core.config import settings
 
 app = FastAPI(
@@ -45,3 +46,4 @@ def health_check():
 #   from app.api.v1 import pronunciation
 #   app.include_router(pronunciation.router, prefix=settings.api_v1_prefix)
 # ──────────────────────────────────────────────────────────────
+app.include_router(stt.router, prefix=settings.api_v1_prefix)
