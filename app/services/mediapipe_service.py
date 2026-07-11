@@ -125,12 +125,19 @@ def _dtw_distance(seq_a: list[np.ndarray], seq_b: list[np.ndarray]) -> float:
     return cost[n, m] / (n + m)  # 경로 길이로 정규화해 시퀀스 길이 차이의 영향을 줄임
 
 
-def compute_mouth_accuracy(user_sequence: list[np.ndarray], reference_sequence: list[np.ndarray]) -> float:
-    """DTW 거리를 0~100점의 입모양 정확도 점수로 변환한다."""
+def compute_mouth_accuracy(
+    user_sequence: list[np.ndarray], reference_sequence: list[np.ndarray], decay: float = 3.0
+) -> float:
+    """DTW 거리를 0~100점의 입모양 정확도 점수로 변환한다.
+
+    decay: 평균 오차가 점수에 얼마나 민감하게 반영될지 조절하는 지수 감쇠 상수.
+    클수록 같은 오차에도 점수가 더 가파르게 떨어진다 (기본 3.0). 채점이 너무
+    박하면 낮추고, 너무 후하면 올린다 (settings.mouth_accuracy_decay 로 조정).
+    """
     if not user_sequence or not reference_sequence:
         raise ValueError("입모양 비교를 위한 좌표 시퀀스가 비어 있습니다.")
 
     avg_distance = _dtw_distance(user_sequence, reference_sequence)
     # 정규화된 좌표계(척도: 눈 사이 거리)에서 평균 오차가 클수록 점수가 지수적으로 감소하도록 매핑
-    accuracy = 100.0 * np.exp(-3.0 * avg_distance)
+    accuracy = 100.0 * np.exp(-decay * avg_distance)
     return float(np.clip(accuracy, 0.0, 100.0))

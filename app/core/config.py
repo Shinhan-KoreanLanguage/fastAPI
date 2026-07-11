@@ -24,6 +24,13 @@ class Settings(BaseSettings):
     stt_weight: float = 0.7
     mediapipe_weight: float = 0.3
 
+    # 입모양 정확도 채점 민감도 (지수 감쇠 상수). 값이 클수록 같은 오차에도
+    # 점수가 더 가파르게 떨어진다. 채점이 너무 박하면 이 값을 낮추세요.
+    mouth_accuracy_decay: float = 3.0
+
+    # 통합 발음 정확도가 이 값 이상이면 "맞은 것"으로 판정 (게임 점수 합격선)
+    pass_threshold: float = 85.0
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 

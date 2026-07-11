@@ -53,3 +53,8 @@ def compute_final_accuracy(
     if mouth_accuracy is None:
         return stt_accuracy
     return stt_accuracy * stt_weight + mouth_accuracy * mediapipe_weight
+
+
+def is_correct(final_accuracy: float, pass_threshold: float) -> bool:
+    """통합 발음 정확도가 합격선 이상이면 '맞은 것'으로 판정한다."""
+    return final_accuracy >= pass_threshold
