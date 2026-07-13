@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     # 스프링부트만 이 서버를 호출하도록 막을 때 쓰는 공유 키 (선택, 비우면 검사 안 함)
     service_api_key: str | None = None
 
+    # 원어민 발음 랜드마크를 저장할 MySQL 접속 정보 (SQLAlchemy 접속 문자열).
+    #   예) mysql+pymysql://사용자명:비밀번호@localhost:3306/pronunciation_ai
+    database_url: str = "mysql+pymysql://root:password@localhost:3306/pronunciation_ai"
+
     # 통합 발음 정확도 가중치 (STT 정확도 + MediaPipe 입모양 정확도 = 1.0).
     # 실측 데이터에 따라 조정 가능하도록 설정값으로 분리 (기본값: STT 0.7 + MediaPipe 0.3)
     stt_weight: float = 0.7

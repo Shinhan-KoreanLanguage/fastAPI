@@ -13,16 +13,34 @@ from pathlib import Path
 # 프로젝트 루트 기준의 `app.xxx` 절대 임포트를 찾지 못한다. 프로젝트 루트를 앞에 넣어 보정.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1 import pronunciation, stt
 from app.core.config import settings
+from app.core.db import Base, engine
+from app import models  # noqa: F401  (Base.metadata에 테이블을 등록시키기 위한 임포트)
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # 서버 시작 시 없는 테이블만 생성 (이미 있으면 건드리지 않음).
+    # MySQL이 아직 안 떠 있어도 STT 등 DB와 무관한 기능은 계속 쓸 수 있도록,
+    # 실패해도 앱 기동 자체는 막지 않고 경고만 남긴다.
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception as e:
+        print(f"[경고] DB 테이블 생성 실패 (MySQL 접속 설정을 확인하세요): {e}")
+    yield
+
 
 app = FastAPI(
     title=settings.app_name,
     description="MediaPipe·STT 기반 한국어 발음 교정 - AI 분석 전용 서버",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 # 스프링부트(다른 포트)에서 호출할 수 있도록 CORS 허용.
