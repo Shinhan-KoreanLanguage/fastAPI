@@ -17,51 +17,62 @@ import numpy as np
 
 _face_mesh_solution = mp.solutions.face_mesh
 
-# MediaPipe Face Mesh는 얼굴당 468개 랜드마크를 반환한다.
-# 입술 주변 랜드마크 인덱스는 라이브러리가 제공하는 연결 그래프(FACEMESH_LIPS)에서 유도한다.
-LIP_LANDMARK_INDICES = sorted({idx for pair in _face_mesh_solution.FACEMESH_LIPS for idx in pair})
-
-# 얼굴 기준점 인덱스 (468 랜드마크 모델에서 널리 쓰이는 코끝·양 눈 바깥쪽 코너).
-# 카메라와 사용자 사이 거리·각도 차이를 보정하는 정규화 기준으로 사용한다.
+# 얼굴 기준점 인덱스 (468 랜드마크 모델에서 널리 쓰이는 코끝·양 눈 바깥쪽 코너·입꼬리·입술 안쪽 중앙).
 NOSE_TIP_INDEX = 1
 LEFT_EYE_OUTER_INDEX = 33
 RIGHT_EYE_OUTER_INDEX = 263
+LEFT_MOUTH_CORNER_INDEX = 61
+RIGHT_MOUTH_CORNER_INDEX = 291
+UPPER_INNER_LIP_INDEX = 13
+LOWER_INNER_LIP_INDEX = 14
 
-_REQUIRED_INDICES = LIP_LANDMARK_INDICES + [NOSE_TIP_INDEX, LEFT_EYE_OUTER_INDEX, RIGHT_EYE_OUTER_INDEX]
+_REQUIRED_INDICES = [
+    NOSE_TIP_INDEX,
+    LEFT_EYE_OUTER_INDEX,
+    RIGHT_EYE_OUTER_INDEX,
+    LEFT_MOUTH_CORNER_INDEX,
+    RIGHT_MOUTH_CORNER_INDEX,
+    UPPER_INNER_LIP_INDEX,
+    LOWER_INNER_LIP_INDEX,
+]
 _MIN_LANDMARK_COUNT = max(_REQUIRED_INDICES) + 1
 
 
-def _normalize_points(points: np.ndarray, nose: np.ndarray, left_eye: np.ndarray, right_eye: np.ndarray) -> np.ndarray:
-    """코를 원점으로, 양 눈 사이 거리를 척도로 좌표를 정규화한다.
+def _extract_mouth_features(landmark_xy: np.ndarray) -> np.ndarray:
+    """전체 468개 랜드마크 좌표(Nx2)를 입모양을 요약하는 두 개의 무차원 비율로 변환한다.
 
-    사용자와 카메라 사이 거리·얼굴 크기가 달라도 입모양 형태 자체만 일관되게 비교하기 위함.
+    원본 좌표(위치)를 그대로 비교하면 화자의 얼굴·입 크기 차이가 그대로 오차에 섞여
+    다른 사람이 찍은 영상끼리 비교할 때 정확도가 왜곡된다. 대신 아래 두 비율만 비교하면
+    화자가 달라도 "입을 얼마나, 어떤 모양으로 움직였는지"만 남는다.
+    - open_ratio: 입이 수직으로 벌어진 정도 (눈 사이 거리 대비, 촬영 거리 보정용)
+    - aspect_ratio: 입의 세로/가로 비율 (입 자체 크기에 대해 스케일 불변이라 개인차 영향이 적음.
+      너비 대신 높이를 분자로 둔 이유는 입을 다물면 분모(너비)는 0에 가까워지지 않지만
+      분자(높이)는 0에 가까워져, width/height로 두면 나눗셈이 불안정해지기 때문)
     """
-    eye_distance = np.linalg.norm(right_eye - left_eye)
-    scale = eye_distance if eye_distance > 1e-6 else 1e-6
-    return (points - nose) / scale
+    eye_distance = np.linalg.norm(landmark_xy[RIGHT_EYE_OUTER_INDEX] - landmark_xy[LEFT_EYE_OUTER_INDEX])
+    eye_distance = eye_distance if eye_distance > 1e-6 else 1e-6
 
+    mouth_width = np.linalg.norm(landmark_xy[RIGHT_MOUTH_CORNER_INDEX] - landmark_xy[LEFT_MOUTH_CORNER_INDEX])
+    mouth_width = mouth_width if mouth_width > 1e-6 else 1e-6
+    mouth_height = np.linalg.norm(landmark_xy[LOWER_INNER_LIP_INDEX] - landmark_xy[UPPER_INNER_LIP_INDEX])
 
-def _extract_lip_frame(landmark_xy: np.ndarray) -> np.ndarray:
-    """전체 468개 랜드마크 좌표(Nx2)에서 입술 좌표만 정규화해 1차원 벡터로 반환한다."""
-    nose = landmark_xy[NOSE_TIP_INDEX]
-    left_eye = landmark_xy[LEFT_EYE_OUTER_INDEX]
-    right_eye = landmark_xy[RIGHT_EYE_OUTER_INDEX]
-    lip_points = landmark_xy[LIP_LANDMARK_INDICES]
-    return _normalize_points(lip_points, nose, left_eye, right_eye).flatten()
+    open_ratio = mouth_height / eye_distance
+    aspect_ratio = mouth_height / mouth_width
+    return np.array([open_ratio, aspect_ratio], dtype=np.float64)
 
 
 def parse_landmark_sequence(frames: list[list[list[float]]]) -> list[np.ndarray]:
-    """클라이언트가 전송한 프레임별 468개 랜드마크 좌표(JSON)를 정규화된 입술 시퀀스로 변환한다.
+    """클라이언트가 전송한 프레임별 468개 랜드마크 좌표(JSON)를 입모양 특징(open_ratio, aspect_ratio) 시퀀스로 변환한다.
 
     각 프레임은 mediapipe Face Mesh와 동일한 인덱스 순서의 [x, y] (또는 [x, y, z]) 468개 좌표여야 한다.
     """
     sequence: list[np.ndarray] = []
     for frame in frames:
         if len(frame) < _MIN_LANDMARK_COUNT:
-            # 기준점(코·눈) 또는 입술 인덱스를 구성하기에 좌표 수가 부족한 프레임은 건너뜀
+            # 기준점(코·눈·입꼬리·입술) 인덱스를 구성하기에 좌표 수가 부족한 프레임은 건너뜀
             continue
         landmark_xy = np.array([[point[0], point[1]] for point in frame], dtype=np.float64)
-        sequence.append(_extract_lip_frame(landmark_xy))
+        sequence.append(_extract_mouth_features(landmark_xy))
     return sequence
 
 
@@ -100,17 +111,17 @@ def extract_raw_landmarks_from_video(video_bytes: bytes) -> list[list[list[float
 
 
 def extract_lip_sequence_from_video(video_bytes: bytes) -> list[np.ndarray]:
-    """웹캠 녹화 영상 파일에서 정규화된 입술 좌표 시퀀스를 추출한다.
+    """웹캠 녹화 영상 파일에서 입모양 특징(open_ratio, aspect_ratio) 시퀀스를 추출한다.
 
     원본 랜드마크 추출(extract_raw_landmarks_from_video) 후 parse_landmark_sequence 와
-    동일한 정규화 로직을 거치므로, 사용자 랜드마크 JSON을 처리하는 경로와 결과가 일관된다.
+    동일한 특징 추출 로직을 거치므로, 사용자 랜드마크 JSON을 처리하는 경로와 결과가 일관된다.
     """
     raw_frames = extract_raw_landmarks_from_video(video_bytes)
     return parse_landmark_sequence(raw_frames)
 
 
 def _dtw_distance(seq_a: list[np.ndarray], seq_b: list[np.ndarray]) -> float:
-    """두 입술 좌표 시퀀스 간 동적 시간 와핑(DTW) 거리를 계산한다.
+    """두 입모양 특징(open_ratio, aspect_ratio) 시퀀스 간 동적 시간 와핑(DTW) 거리를 계산한다.
 
     사용자와 원어민의 발화 속도가 서로 달라 프레임 수가 달라도(시간축 어긋남),
     입모양 형태 자체의 유사도를 비교할 수 있도록 DTW로 시간축을 정렬한다.
@@ -138,6 +149,6 @@ def compute_mouth_accuracy(
         raise ValueError("입모양 비교를 위한 좌표 시퀀스가 비어 있습니다.")
 
     avg_distance = _dtw_distance(user_sequence, reference_sequence)
-    # 정규화된 좌표계(척도: 눈 사이 거리)에서 평균 오차가 클수록 점수가 지수적으로 감소하도록 매핑
+    # 무차원 비율 특징(open_ratio, aspect_ratio) 기준 평균 오차가 클수록 점수가 지수적으로 감소하도록 매핑
     accuracy = 100.0 * np.exp(-decay * avg_distance)
     return float(np.clip(accuracy, 0.0, 100.0))

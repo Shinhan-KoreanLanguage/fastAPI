@@ -78,4 +78,6 @@ app.include_router(pronunciation.router, prefix=settings.api_v1_prefix)
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=True)
+    # host="0.0.0.0": 루프백(127.0.0.1)뿐 아니라 이 PC의 모든 네트워크 인터페이스에서
+    # 들어오는 연결을 받는다. 공유기 포트포워딩으로 외부 접속을 받으려면 필수.
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

@@ -30,7 +30,11 @@ class Settings(BaseSettings):
 
     # 입모양 정확도 채점 민감도 (지수 감쇠 상수). 값이 클수록 같은 오차에도
     # 점수가 더 가파르게 떨어진다. 채점이 너무 박하면 이 값을 낮추세요.
-    mouth_accuracy_decay: float = 3.0
+    # mediapipe_service의 비교 대상이 원본 좌표(80차원)에서 open_ratio/aspect_ratio
+    # 비율 특징(2차원)으로 바뀌면서 avg_distance 값 자체가 훨씬 작아졌다. 기존
+    # 좌표 기준으로 튜닝된 값(예: 0.8)을 그대로 쓰면 거의 모든 입력이 고득점으로
+    # 나오니, 이 스케일에 맞춰 다시 튜닝해야 한다 (10 안팎에서 시작해보는 것을 권장).
+    mouth_accuracy_decay: float = 8.0
 
     # 통합 발음 정확도가 이 값 이상이면 "맞은 것"으로 판정 (게임 점수 합격선)
     pass_threshold: float = 85.0

@@ -1,0 +1,22 @@
+INFO:     Will watch for changes in these directories: ['C:\\Users\\u\\Desktop\\fastAPI']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [31504] using WatchFiles
+INFO:     Started server process [23960]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     192.168.0.1:9319 - "GET /docs HTTP/1.1" 200 OK
+INFO:     192.168.0.1:9319 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:     27.0.238.71:49190 - "GET /docs HTTP/1.1" 200 OK
+INFO:     27.0.238.117:58612 - "GET / HTTP/1.1" 404 Not Found
+INFO:     1.227.152.217:65523 - "GET /docs HTTP/1.1" 200 OK
+INFO:     1.227.152.217:65523 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:     192.168.0.1:34172 - "GET /docs HTTP/1.1" 200 OK
+INFO:     192.168.0.1:34172 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:     27.0.238.114:54476 - "GET /docs HTTP/1.1" 200 OK
+INFO:     27.0.238.187:53672 - "GET / HTTP/1.1" 404 Not Found
+INFO:     1.227.152.217:55370 - "GET / HTTP/1.1" 404 Not Found
+INFO:     1.227.152.217:65173 - "GET / HTTP/1.1" 404 Not Found
+INFO:     1.227.152.217:50002 - "GET /docs HTTP/1.1" 200 OK
+INFO:     1.227.152.217:50633 - "GET /docs HTTP/1.1" 200 OK
+INFO:     1.227.152.217:60699 - "GET /docs HTTP/1.1" 200 OK
+INFO:     1.227.152.217:60699 - "GET /openapi.json HTTP/1.1" 200 OK
