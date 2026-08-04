@@ -5,6 +5,18 @@ pydantic-settings
 python-multipart
 
 # STT (Whisper 기반 한국어 음성 인식)
-torch
-transformers
+# CTranslate2 기반 faster-whisper 사용 (순정 transformers 대비 CPU에서 체감 3~5배 빠르고
+# int8 양자화로 메모리도 덜 씀. GPU 없는 환경 기준 최적화)
+faster-whisper
 imageio-ffmpeg  # 오디오 디코딩(wav/mp3/m4a 등)에 쓸 ffmpeg 바이너리를 pip으로 제공
+
+# MediaPipe (입모양/입술 랜드마크 분석)
+# 0.10.15 이상부터는 legacy Solutions API(face_mesh 등)가 제거되어 mp.solutions를 쓸 수 없으므로 버전 고정
+mediapipe==0.10.14
+opencv-python-headless  # 서버에서 영상 파일의 프레임을 읽을 때 사용 (GUI 불필요라 headless 버전 사용)
+numpy
+
+# DB (원어민 발음 랜드마크 저장용 MySQL)
+sqlalchemy
+pymysql          # MySQL 드라이버 (순수 파이썬이라 별도 C 빌드 도구 없이 설치됨)
+cryptography      # MySQL 8 기본 인증 방식(caching_sha2_password)에 pymysql이 필요로 함

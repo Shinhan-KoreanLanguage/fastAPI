@@ -44,10 +44,15 @@ pronunciation-ai/
 
 ## 실행 방법 (Windows / PowerShell)
 
+> **Python 버전 주의**: 반드시 **Python 3.11 또는 3.12**로 가상환경을 만드세요.
+> `mediapipe==0.10.14`(입모양 분석에 쓰는 레거시 `mp.solutions` API가 남아있는
+> 마지막 버전)는 Python 3.13용 wheel이 없어서, 3.13으로 설치하면 최신
+> mediapipe가 대신 깔리고 `mp.solutions`가 없어 서버가 아예 기동되지 않습니다.
+
 ```powershell
 cd C:\Users\socce\pronunciation-ai
 
-python -m venv .venv               # 가상환경 생성 (최초 1회)
+py -3.12 -m venv .venv             # 가상환경 생성 (최초 1회, Python 3.11/3.12 사용)
 .\.venv\Scripts\Activate.ps1       # 가상환경 활성화
 pip install -r requirements.txt    # 패키지 설치
 copy .env.example .env             # 환경설정 파일 생성
