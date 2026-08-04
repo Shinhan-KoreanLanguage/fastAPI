@@ -39,6 +39,19 @@ class Settings(BaseSettings):
     # 통합 발음 정확도가 이 값 이상이면 "맞은 것"으로 판정 (게임 점수 합격선)
     pass_threshold: float = 85.0
 
+    # 억양(피치) 유사도 채점 민감도 (지수 감쇠 상수, 단위는 세미톤 기준 평균 오차).
+    # pitch_accuracy는 final_accuracy/is_correct 판정에 반영되지 않는 참고
+    # 지표(VIZ-001 음성 시각화)라 mouth_accuracy_decay와 별도로 관리한다.
+    pitch_similarity_decay: float = 0.3
+
+    # 오차 구간 하이라이트 임계값 (세미톤). 사용자-원어민 피치 오차가 이 값을
+    # 넘는 구간을 FUR-010 하이라이트 구간으로 표시한다.
+    pitch_error_threshold_semitone: float = 2.0
+
+    # 두 피치 시퀀스 길이 비율이 이 값을 넘으면(예: 발화가 통째로 누락됨)
+    # 정상적인 시간축 정렬이 불가능하다고 보고 비교를 생략한다 (FUR-010 5번 요구사항).
+    pitch_length_mismatch_ratio: float = 3.0
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 

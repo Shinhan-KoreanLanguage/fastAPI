@@ -16,7 +16,10 @@ mediapipe==0.10.14
 opencv-python-headless  # 서버에서 영상 파일의 프레임을 읽을 때 사용 (GUI 불필요라 headless 버전 사용)
 numpy
 
-# DB (원어민 발음 랜드마크 저장용 MySQL)
+# DB (원어민 발음 랜드마크/피치 저장용 MySQL)
 sqlalchemy
 pymysql          # MySQL 드라이버 (순수 파이썬이라 별도 C 빌드 도구 없이 설치됨)
 cryptography      # MySQL 8 기본 인증 방식(caching_sha2_password)에 pymysql이 필요로 함
+
+# 음성 시각화 (피치/억양 추출, VIZ-001)
+librosa           # pyin 알고리즘으로 프레임별 기본주파수(F0)를 추출
