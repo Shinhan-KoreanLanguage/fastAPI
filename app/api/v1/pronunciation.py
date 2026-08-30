@@ -126,6 +126,44 @@ def analyze_pronunciation(
     }
 
 
+@router.post("/score")
+def score_pronunciation(
+    audio: UploadFile = File(..., description="학습자가 녹음한 발화 오디오 파일"),
+    target_text: str = Form(..., description="학습자에게 제시된 단어/문장"),
+):
+    """게임용 - STT 정확도만 빠르게 산출한다 (억양·입모양 분석 생략).
+
+    /analyze는 억양 곡선(피치 추출 + DTW 비교 + 음절 분할)까지 계산하는데,
+    게임은 그중 final_accuracy 하나만 쓰고 나머지를 버린다. 영상을 받지 않으므로
+    final_accuracy는 어차피 stt_accuracy와 같다(compute_final_accuracy 참고).
+    버려질 계산을 애초에 하지 않도록 분리한 것이 이 엔드포인트다.
+
+    STT도 게임용 경량 모델로 돌린다. 단어 하나의 정오답만 가리면 되므로
+    발음 연습(/analyze)만큼의 정확도가 필요 없고, 게임은 응답 지연이 곧
+    플레이 불가로 이어지기 때문이다.
+
+    피드백 화면처럼 억양 곡선·음절별 점수가 필요한 경우에는 /analyze를 쓸 것.
+    """
+    audio_bytes = audio.file.read()
+    if not audio_bytes:
+        raise HTTPException(status_code=400, detail="빈 오디오 파일입니다.")
+
+    try:
+        recognized_text = stt_service.transcribe(audio_bytes, fast=True)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"오디오를 처리할 수 없습니다: {e}")
+
+    stt_accuracy = pronunciation_service.compute_stt_accuracy(target_text, recognized_text)
+
+    # 필드명은 /analyze와 맞춘다 - 스프링이 같은 파서로 읽을 수 있도록.
+    return {
+        "recognized_text": recognized_text,
+        "stt_accuracy": round(stt_accuracy, 2),
+        "final_accuracy": round(stt_accuracy, 2),
+        "is_correct": pronunciation_service.is_correct(stt_accuracy, settings.pass_threshold),
+    }
+
+
 @router.get("/reference")
 def get_reference(
     text: str = Query(..., description="조회할 학습 문장/단어 (analyze의 target_text와 동일해야 매칭됨)"),

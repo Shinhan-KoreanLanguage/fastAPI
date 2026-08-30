@@ -21,6 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1 import pronunciation, stt
 from app.core.config import settings
 from app.core.db import Base, engine
+from app.services import stt_service
 from app import models  # noqa: F401  (Base.metadata에 테이블을 등록시키기 위한 임포트)
 
 
@@ -33,6 +34,20 @@ async def lifespan(_app: FastAPI):
         Base.metadata.create_all(bind=engine)
     except Exception as e:
         print(f"[경고] DB 테이블 생성 실패 (MySQL 접속 설정을 확인하세요): {e}")
+
+    # STT 모델을 미리 로드해둔다. lru_cache 특성상 그냥 두면 프로세스의 첫 요청이
+    # 모델 로딩 시간까지 떠안는데(실측 base 약 1.2초, small 약 2.7초), 하필 그 첫
+    # 요청이 게임 중인 사용자일 수 있다. 기동이 조금 늦어지더라도 요청 지연을
+    # 일정하게 만드는 편이 낫다.
+    # 모델 파일이 아직 없으면 최초 1회 다운로드가 일어나므로 여기서 더 오래 걸린다.
+    # 네트워크 문제로 실패해도 서버 기동 자체는 막지 않는다 - 그 경우 예전처럼
+    # 첫 요청 때 다시 시도하게 된다.
+    for model_name in (stt_service.GAME_MODEL, stt_service.DETAIL_MODEL):
+        try:
+            stt_service._load_model(model_name)
+        except Exception as e:
+            print(f"[경고] STT 모델 사전 로드 실패 ({model_name}): {e}")
+
     yield
 
 
