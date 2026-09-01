@@ -34,7 +34,11 @@ def analyze_pronunciation(
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"오디오를 처리할 수 없습니다: {e}")
 
-    stt_accuracy = pronunciation_service.compute_stt_accuracy(target_text, recognized_text)
+    try:
+        stt_accuracy = pronunciation_service.compute_stt_accuracy(target_text, recognized_text)
+    except ValueError as e:
+        # target_text에 비교할 문자가 없는 경우 - 잘못된 요청이므로 400으로 응답한다.
+        raise HTTPException(status_code=400, detail=str(e))
 
     mouth_accuracy = None
     if video is not None:
@@ -153,7 +157,12 @@ def score_pronunciation(
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"오디오를 처리할 수 없습니다: {e}")
 
-    stt_accuracy = pronunciation_service.compute_stt_accuracy(target_text, recognized_text)
+    try:
+        stt_accuracy = pronunciation_service.compute_stt_accuracy(target_text, recognized_text)
+    except ValueError as e:
+        # target_text에 비교할 문자가 없는 경우(공백·문장 부호만, 인코딩 깨짐 등).
+        # 요청이 잘못된 것이므로 500이 아니라 400으로 알려준다.
+        raise HTTPException(status_code=400, detail=str(e))
 
     # 필드명은 /analyze와 맞춘다 - 스프링이 같은 파서로 읽을 수 있도록.
     return {
