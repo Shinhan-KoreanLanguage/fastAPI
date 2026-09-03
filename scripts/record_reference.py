@@ -47,7 +47,10 @@ def build_arg_parser():
     p.add_argument("--text", required=True, help="학습 단어/문장. 파일 이름과 화면 안내에 쓰인다")
     p.add_argument("--outdir", default="recordings", help="저장 폴더 (기본: recordings)")
     p.add_argument("--camera", type=int, default=0, help="웹캠 인덱스 (기본 0, 화면이 안 나오면 1로)")
-    p.add_argument("--mic", default="마이크(USB 2.0 Camera)", help="마이크 장치 이름")
+    # 웹캠 내장 마이크보다 음질이 좋아 기본값으로 둔다. 이 오디오에서 STT와 피치를
+    # 뽑으므로 음질이 점수 정확도에 그대로 영향을 준다.
+    # 장치 목록은 ffmpeg -list_devices true -f dshow -i dummy 로 확인할 수 있다.
+    p.add_argument("--mic", default="마이크(K66)", help="마이크 장치 이름")
     p.add_argument("--blur", type=int, default=35, help="배경 블러 강도, 홀수 (기본 35)")
     return p
 
@@ -78,12 +81,20 @@ def stop_audio_capture(proc: subprocess.Popen) -> bool:
     return proc.returncode == 0
 
 
-def mux(video_path: Path, wav_path: Path, out_path: Path) -> bool:
-    """무음 영상과 음성을 하나의 mp4로 합친다 (재인코딩 없이 스트림 복사)."""
+def mux(video_path: Path, wav_path: Path, out_path: Path, fps: float) -> bool:
+    """무음 영상과 음성을 하나의 mp4로 합친다.
+
+    fps는 촬영 중 실제로 처리된 프레임 수로 계산한 값이다. 배경 분리 연산 때문에
+    루프가 목표 FPS를 못 따라가는데, 기록할 때 30fps로 고정해 버리면 영상이
+    빨리 감기고 길이가 음성보다 짧아진다(-shortest가 소리를 잘라버림).
+    그래서 입력 프레임레이트를 실제 값으로 다시 지정해 시간축을 맞춘다.
+    """
     command = [
         FFMPEG, "-hide_banner", "-loglevel", "error", "-y",
-        "-i", str(video_path), "-i", str(wav_path),
-        "-c:v", "copy", "-c:a", "aac", "-shortest",
+        "-r", "%.4f" % fps, "-i", str(video_path),
+        "-i", str(wav_path),
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "veryfast",
+        "-c:a", "aac",
         str(out_path),
     ]
     return subprocess.run(command, capture_output=True).returncode == 0
@@ -148,7 +159,14 @@ def main():
     audio_proc = None
     tmp_video = tmp_wav = None
     started_at = 0.0
+    frame_count = 0
     saved = []
+
+    # 얼굴 인식은 화면 안내(FACE OK)에만 쓰는 값이라 매 프레임 돌릴 필요가 없다.
+    # 배경 분리와 함께 매번 돌리면 루프가 11fps까지 떨어져 녹화 길이가 어긋난다.
+    FACE_CHECK_INTERVAL = 5
+    loop_index = 0
+    face_ok = False
 
     print("준비됐습니다. 미리보기 창에서 스페이스=녹화, Q=종료")
     try:
@@ -167,11 +185,15 @@ def main():
 
             if writer is not None:
                 writer.write(composited)
+                frame_count += 1
+
+            if loop_index % FACE_CHECK_INTERVAL == 0:
+                face_ok = has_face(face_mesh, frame_rgb)
+            loop_index += 1
 
             preview = composited.copy()
             draw_hud(preview, args.text, writer is not None,
-                     time.time() - started_at if writer else 0.0,
-                     has_face(face_mesh, frame_rgb))
+                     time.time() - started_at if writer else 0.0, face_ok)
             cv2.imshow("record_reference  (SPACE=rec, Q=quit)", preview)
 
             key = cv2.waitKey(1) & 0xFF
@@ -186,15 +208,19 @@ def main():
                                              FPS, (frame.shape[1], frame.shape[0]))
                     audio_proc = start_audio_capture(args.mic, tmp_wav)
                     started_at = time.time()
+                    frame_count = 0
                     print("  녹화 시작")
                 else:
+                    elapsed = max(time.time() - started_at, 0.001)
+                    actual_fps = max(frame_count / elapsed, 1.0)
                     writer.release()
                     writer = None
                     ok_audio = stop_audio_capture(audio_proc)
                     audio_proc = None
+                    print("  %.1f초 / %d프레임 (실측 %.1f fps)" % (elapsed, frame_count, actual_fps))
 
                     final = outdir / tmp_video.name.replace("_silent", "")
-                    if ok_audio and tmp_wav.exists() and mux(tmp_video, tmp_wav, final):
+                    if ok_audio and tmp_wav.exists() and mux(tmp_video, tmp_wav, final, actual_fps):
                         tmp_video.unlink(missing_ok=True)
                         print("  저장: %s" % final)
                         print("        %s" % tmp_wav)
